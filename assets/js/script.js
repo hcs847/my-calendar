@@ -8,9 +8,19 @@ for (var i = 9; i < 18; i++) {
   hoursOfDay.push(hourStart);
 }
 
+// calculating hours passed since begining of work day
+var getHours = function () {
+  var now = moment();
+  var startOfDay = moment().startOf("day").add(9, "hours");
+  var hoursPassed = now.diff(startOfDay, "hours");
+  return hoursPassed;
+};
+
 // storing list of events in local storage
 var storeEvents = function () {
-  if (events.length === 0) {
+  // when accessing for the first time or on a new day
+  // initializing the array of evenet objects
+  if (events.length === 0 || getHours() === 0) {
     setInitialEvents();
   }
   localStorage.setItem("hourly-planner", JSON.stringify(events));
@@ -24,14 +34,6 @@ var setInitialEvents = function () {
       description: "",
     };
   }
-};
-
-// calculating hours passed since begining of work day
-var currentTime = function () {
-  var now = moment();
-  var startOfDay = moment().startOf("day").add(9, "hours");
-  var hoursPassed = now.diff(startOfDay, "hours");
-  return hoursPassed;
 };
 
 // emptying the HTML before rendering
@@ -50,13 +52,13 @@ $.each(hoursOfDay, function (index, hour) {
 // function to render the planner
 function renderRow(index, hour, list) {
   var plannerTime = $("<div>").addClass(
-    "col-2 d-flex flex-row-reverse align-items-center p-0 border border-left-0"
+    "col-1 d-flex flex-row-reverse align-items-center px-2 border border-left-0"
   );
   var plannerEvent = $("<div>")
-    .addClass("col-7 d-flex flex-column p-0 border")
+    .addClass("col-8 d-flex flex-column p-0 border")
     .attr("event-id", index);
   var plannerCard = $("<div>")
-    .addClass("card event-item")
+    .addClass("card event-item p-0")
     .css("height", "50px");
   var plannerButton = $("<div>").addClass("col-1 d-flex flex-column p-0");
   var plannerRow = $("<div>")
@@ -84,13 +86,13 @@ function renderRow(index, hour, list) {
 
 // changing background to red for current hour, grey => previous and green=>upcoming
 function updateBackground(index, savedEvent) {
-  if (currentTime() === index) {
+  if (getHours() === index) {
     savedEvent.addClass("bg-danger");
   }
-  if (currentTime() < index) {
+  if (getHours() < index) {
     savedEvent.addClass("bg-success");
   }
-  if (currentTime() > index) {
+  if (getHours() > index) {
     savedEvent.addClass("bg-light");
   }
 }
@@ -120,19 +122,47 @@ $(".btn").on("click", function (event) {
 
   // traversing up to parent and down to relevant child to select the element
   var eventToUpdate = $(this).closest(".row").find("p");
-
+  console.log("this is event To update: ", eventToUpdate);
   // extracting the newly entered text
   var savedText = $(this).closest(".row").find("p").text();
 
   // updating the list of objects with the new saved text
   events[savedIndex].description = savedText;
 
-  // reapplying background conditions
+  // re-applying background conditions after changing the element
+  updateBackground(savedIndex, eventToUpdate);
+  // re-applying background conditions after changing the element
   updateBackground(savedIndex, eventToUpdate);
 
-  // saving changes in local storage
+  // saving changes to local storage
   storeEvents();
 });
 
-// automate refresh until end of day and clear before the next day
-var auditTime = function () {};
+// save changes when leaving the textarea box
+$(".event-item").on("blur", "textarea", function () {
+  var text = $(this).val().trim();
+  var index = $(this).closest(".row").attr("row-id");
+  $(this).text(text);
+  events[index].description = text;
+
+  // saving changes to local storage
+  storeEvents();
+
+  // recreate the p element
+  var eventEl = $("<p>")
+    .addClass("event-item card-body m-0")
+    .css("height", "50px")
+    .text(text);
+
+  // replace textarea with p element
+  $(this).replaceWith(eventEl);
+});
+
+// automate refresh of backgrounds to run every 2 minutes
+setInterval(function () {
+  $(".event-item p").each(function (index, e) {
+    // run the update background function for the selected event
+    // which is converted to a jQuery elemnt
+    updateBackground(index, $(e));
+  });
+}, 1000 * 60 * 2);
